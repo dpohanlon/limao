@@ -250,8 +250,15 @@ class Limao(object):
         return intensityTable
 
     def intensityOnElevation(self, intensityTable, elevationOrientation):
+
+        # North, elevationOrientation = 0, going clockwise
         # How to specify the 'normal'?
-        pass
+        left_az = np.mod(90 + elevationOrientation, 360)
+        right_az = np.mod(270 + elevationOrientation, 360)
+
+        az_north = (intensityTable['azimuth'] < left_az) | (intensityTable['azimuth'] > right_az)
+
+        return intensityTable[az_north]['intensity_passed'], intensityTable[~az_north]['intensity_passed']
 
 
 if __name__ == '__main__':
