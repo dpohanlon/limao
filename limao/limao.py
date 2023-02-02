@@ -37,11 +37,14 @@ from datetime import datetime, timezone, timedelta
 
 class Limao(object):
 
-    def __init__(self, fileName, locLL, size):
+    def __init__(self, fileName, locLL, size, buidingAltitude = 0):
 
         self.fileName = fileName
         self.locLL = locLL
         self.size = size
+
+        # Does nothing, yet
+        self.buildingAltitude = buildingAltitude
 
         self.startDate = datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc)
 
@@ -229,6 +232,27 @@ class Limao(object):
             date = date + timedelta(hours = 1)
 
         return altitudes, azimuths, intensities, occluded, np.array(dates)
+
+    def yearlyIntensityTable(self):
+
+        altitudes, azimuths, intensities, occluded, dates = self.yearlyIntensity()
+
+        intensityTable = pd.DataFrame( {
+            'date' : dates,
+            'altitude' : altitudes,
+            'azimuth' : azimuths,
+            'intensity' : intensities,
+            'occluded' : occluded
+        })
+
+        intensityTable['intensity_passed'] = np.where(intensityTable['occluded'], 0, intensityTable['intensity'])
+
+        return intensityTable
+
+    def intensityOnElevation(self, intensityTable, elevationOrientation):
+        # How to specify the 'normal'?
+        pass
+
 
 if __name__ == '__main__':
     pass
