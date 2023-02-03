@@ -86,7 +86,7 @@ class Limao(object):
 
         return self.dataPx - pxY, pxX
 
-    def selectArea(self, data, loc, size=250):
+    def selectArea(self, data, loc, size=150):
 
         # Return a size x size region with loc in the centre
 
@@ -158,6 +158,11 @@ class Limao(object):
         # Distance from loc
         dist = np.sqrt((xx - size // 2) ** 2 + (yy - size // 2) ** 2)
 
+        plt.imshow(dist)
+        plt.colorbar()
+        plt.savefig("dist.png")
+        plt.clf()
+
         # pixel to real distance
         dist *= self.scaleToPx
 
@@ -178,11 +183,11 @@ class Limao(object):
 
         return mags
 
-    def loadRegion(self, data, locLL):
+    def loadRegion(self, data, locLL, size=100):
 
         locOS = latlon_to_os(*locLL)
 
-        region = self.selectArea(data, locOS)
+        region = self.selectArea(data, locOS, size=size)
 
         return region
 
@@ -200,12 +205,24 @@ class Limao(object):
         # alt IN DEGREES
         return np.tan(np.radians(alt))
 
-    def yearlyIntensity(self):
+    def yearlyIntensity(self, size):
 
-        region = self.loadRegion(self.data, self.locLL)
-        regionDTM = self.loadRegion(self.dataDTM, self.locLL)
+        region = self.loadRegion(self.data, self.locLL, size=size)
+        regionDTM = self.loadRegion(self.dataDTM, self.locLL, size=size)
+
+        plt.imshow(region)
+        plt.savefig("region.png")
+        plt.clf()
+
+        plt.imshow(regionDTM)
+        plt.savefig("regionDTM.png")
+        plt.clf()
 
         mags = self.observedSizes(region, regionDTM)
+
+        plt.imshow(mags)
+        plt.savefig("mags.png")
+        plt.clf()
 
         hoursInYear = 24 * 7 * 52
 
@@ -244,9 +261,9 @@ class Limao(object):
 
         return altitudes, azimuths, intensities, occluded, np.array(dates)
 
-    def yearlyIntensityTable(self):
+    def yearlyIntensityTable(self, size=100):
 
-        altitudes, azimuths, intensities, occluded, dates = self.yearlyIntensity()
+        altitudes, azimuths, intensities, occluded, dates = self.yearlyIntensity(size)
 
         intensityTable = pd.DataFrame(
             {
@@ -262,9 +279,16 @@ class Limao(object):
             intensityTable["occluded"], 0, intensityTable["intensity"]
         )
 
+        intensityTable["day"] = intensityTable["date"].map(
+            lambda x: x.timetuple().tm_yday
+        )
+        intensityTable["week"] = intensityTable["date"].map(
+            lambda x: x.isocalendar()[1]
+        )
+
         return intensityTable
 
-    def intensityOnElevation(self, intensityTable, elevationOrientation):
+    def intensityOnElevation(self, intensityTable, elevationOrientation=0):
 
         # North, elevationOrientation = 0, going clockwise
         # How to specify the 'normal'?
@@ -276,6 +300,7 @@ class Limao(object):
         )
 
         return (
+            az_north,
             intensityTable[az_north]["intensity_passed"],
             intensityTable[~az_north]["intensity_passed"],
         )
@@ -300,10 +325,46 @@ if __name__ == "__main__":
         "-lon", type=float, dest="lon", default=None, help="Longitude."
     )
 
+    argParser.add_argument(
+        "--size", type=int, dest="size", default=100, help="Region Size"
+    )
+
     args = argParser.parse_args()
 
-    limao = Limao(args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), 100)
+    limao = Limao(args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), args.size)
 
-    table = limao.yearlyIntensityTable()
+    # plt.imshow(limao.data.data.squeeze())
+    # plt.savefig('data.png')
+    # exit(0)
 
-    print(table)
+    table = limao.yearlyIntensityTable(args.size)
+
+    isNorth, _, _ = limao.intensityOnElevation(table)
+    table["isNorth"] = isNorth
+
+    plt.plot(table[~table["isNorth"]]["intensity_passed"], alpha=0.5, label="South")
+    plt.plot(table[table["isNorth"]]["intensity_passed"], alpha=0.5, label="North")
+
+    plt.xlabel("Hours from 1/1", fontsize=14)
+    plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
+    plt.legend(loc=0, fontsize=14)
+    plt.savefig("test.pdf")
+    plt.clf()
+
+    tableDayAvg = (
+        table.groupby(["day", "isNorth"])
+        .agg({"intensity_passed": "mean", "altitude": "mean", "azimuth": "mean"})
+        .reset_index()
+    )
+
+    # plt.plot(tableDayAvg[~tableDayAvg['isNorth']]['day'], tableDayAvg[~tableDayAvg['isNorth']]['intensity_passed'], alpha = 0.5, label = 'South')
+    # plt.plot(tableDayAvg[tableDayAvg['isNorth']]['day'], tableDayAvg[tableDayAvg['isNorth']]['intensity_passed'], alpha = 0.5, label = 'North')
+
+    # plt.plot(tableDayAvg['day'], tableDayAvg['altitude'])
+    plt.plot(tableDayAvg["day"], tableDayAvg["azimuth"])
+
+    plt.xlabel("Day", fontsize=14)
+    plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
+    plt.legend(loc=0, fontsize=14)
+    plt.savefig("testDayAvg.pdf")
+    plt.clf()
