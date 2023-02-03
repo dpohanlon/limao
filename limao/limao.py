@@ -37,9 +37,10 @@ from datetime import datetime, timezone, timedelta
 
 class Limao(object):
 
-    def __init__(self, fileName, locLL, size, buidingAltitude = 0):
+    def __init__(self, fileNameDSM, fileNameDTM, locLL, size, buidingAltitude = 0):
 
-        self.fileName = fileName
+        self.fileNameDSM = fileNameDSM
+        self.fileNameDTM = fileNameDTM
         self.locLL = locLL
         self.size = size
 
@@ -51,7 +52,8 @@ class Limao(object):
         self.locIdxX = self.size // 2
         self.locIdxY = self.size // 2
 
-        data = rxr.open_rasterio(self.fileName, masked=True)
+        data = rxr.open_rasterio(self.fileNameDSM, masked=True)
+        dataDTM = rxr.open_rasterio(self.fileNameDTM, masked=True)
 
         self.setDataParams(data)
 
@@ -160,14 +162,15 @@ class Limao(object):
 
         return dist
 
-    def observedSizes(self, region):
+    def observedSizes(self, region, regionDTM):
 
         size = region.shape[0]
 
         dist = distanceMatrix(size)
 
-        # A hack to offset the terrain
-        mags = (region - np.min(region)) / dist
+        # Only consider relative heights, using the terrain map for the 'ground'
+        # floor
+        mags = (region - regionDTM[locIdxX][locIdxY]) / dist
 
         return mags
 
@@ -196,7 +199,9 @@ class Limao(object):
     def yearlyIntensity(self):
 
         region = self.loadRegion(self.data, self.locLL)
-        mags = self.observedSizes(region)
+        regionDTM = self.loadRegion(self.dataDTM, self.locLL)
+
+        mags = self.observedSizes(region, regionDTM)
 
         hoursInYear = 24 * 7 * 52
 
