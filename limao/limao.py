@@ -357,14 +357,52 @@ if __name__ == "__main__":
         .reset_index()
     )
 
-    # plt.plot(tableDayAvg[~tableDayAvg['isNorth']]['day'], tableDayAvg[~tableDayAvg['isNorth']]['intensity_passed'], alpha = 0.5, label = 'South')
-    # plt.plot(tableDayAvg[tableDayAvg['isNorth']]['day'], tableDayAvg[tableDayAvg['isNorth']]['intensity_passed'], alpha = 0.5, label = 'North')
+    tableWeekAvg = (
+        table.groupby(["week", "isNorth"])
+        .agg({"intensity_passed": "mean", "altitude": "mean", "azimuth": "mean"})
+        .reset_index()
+    )
+
+    plt.plot(
+        tableDayAvg[~tableDayAvg["isNorth"]]["day"],
+        tableDayAvg[~tableDayAvg["isNorth"]]["intensity_passed"],
+        alpha=0.5,
+        label="South",
+    )
+    plt.plot(
+        tableDayAvg[tableDayAvg["isNorth"]]["day"],
+        tableDayAvg[tableDayAvg["isNorth"]]["intensity_passed"],
+        alpha=0.5,
+        label="North",
+    )
 
     # plt.plot(tableDayAvg['day'], tableDayAvg['altitude'])
-    plt.plot(tableDayAvg["day"], tableDayAvg["azimuth"])
+    # plt.plot(tableDayAvg["day"], tableDayAvg["azimuth"])
 
     plt.xlabel("Day", fontsize=14)
     plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
     plt.legend(loc=0, fontsize=14)
     plt.savefig("testDayAvg.pdf")
+    plt.clf()
+
+    plt.plot(
+        tableWeekAvg[~tableWeekAvg["isNorth"]]["week"],
+        tableWeekAvg[~tableWeekAvg["isNorth"]]["intensity_passed"],
+        alpha=0.5,
+        label="South",
+    )
+    plt.plot(
+        tableWeekAvg[tableWeekAvg["isNorth"]]["week"],
+        tableWeekAvg[tableWeekAvg["isNorth"]]["intensity_passed"],
+        alpha=0.5,
+        label="North",
+    )
+
+    # plt.plot(tableDayAvg['day'], tableDayAvg['altitude'])
+    # plt.plot(tableDayAvg["day"], tableDayAvg["azimuth"])
+
+    plt.xlabel("Week", fontsize=14)
+    plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
+    plt.legend(loc=0, fontsize=14)
+    plt.savefig("testWeekAvg.pdf")
     plt.clf()
