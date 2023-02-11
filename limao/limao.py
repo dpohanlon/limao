@@ -418,7 +418,7 @@ if __name__ == "__main__":
     )
 
     argParser.add_argument(
-        "-lat", type=float, dest="lat", default=None, help="Latitutde."
+        "-lat", type=float, dest="lat", default=None, help="Latitude."
     )
     argParser.add_argument(
         "-lon", type=float, dest="lon", default=None, help="Longitude."
