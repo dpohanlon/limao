@@ -7,7 +7,7 @@ Primarily this depends on the the building orientation, the latitude, and the ti
 
 # Usage
 
-Requires digital surface models (DSM) and digital terrain models (DTM) for the region of interest, in addition to the latitude and longitude. For the UK these are available from [DEFRA](https://www.data.gov.uk/dataset/f0db0249-f17b-4036-9e65-309148c97ce4/national-lidar-programme) ()[direct link](https://environment.data.gov.uk/DefraDataDownload/?Mode=survey)), and are derived from satellite LIDAR measurements. Latitude and longitude can be obtained from Google Maps.
+Requires digital surface models (DSM) and digital terrain models (DTM) for the region of interest, in addition to the latitude and longitude. For the UK these are available from [DEFRA](https://www.data.gov.uk/dataset/f0db0249-f17b-4036-9e65-309148c97ce4/national-lidar-programme) ([direct link](https://environment.data.gov.uk/DefraDataDownload/?Mode=survey)), and are derived from satellite LIDAR measurements. Latitude and longitude can be obtained from Google Maps.
 
 At the moment this ignores occlusions within a configurable distance from the indicated location to avoid 'self' intersections, but this will probably be improved later.
 
@@ -17,8 +17,8 @@ usage: limao.py [-h] [-s FILENAMEDSM] [-t FILENAMEDTM] [-lat LAT] [-lon LON] [--
 
 optional arguments:
   -h, --help      show this help message and exit
-  -s FILENAMEDSM  DSM input file.
-  -t FILENAMEDTM  DTM input file.
+  -s FILENAMEDSM  DSM input file (.tif).
+  -t FILENAMEDTM  DTM input file (.tif).
   -lat LAT        Latitude.
   -lon LON        Longitude.
   --size SIZE     Region Size around location.
