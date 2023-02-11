@@ -185,6 +185,8 @@ class Limao(object):
 
     def loadRegion(self, data, locLL, size=100):
 
+        # Convert lat/lon to UK OS coordinates for the DSM/DTM
+
         locOS = latlon_to_os(*locLL)
 
         region = self.selectArea(data, locOS, size=size)
@@ -207,6 +209,8 @@ class Limao(object):
 
     def yearlyIntensity(self, size):
 
+        # Get surface and terrain maps
+
         region = self.loadRegion(self.data, self.locLL, size=size)
         regionDTM = self.loadRegion(self.dataDTM, self.locLL, size=size)
 
@@ -217,6 +221,8 @@ class Limao(object):
         plt.imshow(regionDTM)
         plt.savefig("regionDTM.png")
         plt.clf()
+
+        # Calculate observed heights of objects
 
         mags = self.observedSizes(region, regionDTM)
 
@@ -234,18 +240,28 @@ class Limao(object):
 
         date = self.startDate
 
+        # For each hour over a year
+
         for i in tqdm(range(hoursInYear)):
+
+            # Get sun properties for this date and location
 
             altitude = self.getAltitude(date, self.locLL)
             azimuth = self.getAzmuth(date, self.locLL)
 
             radiation = self.getRadiation(date, altitude)
 
+            # Calculate the threshold below which `mags` occludes the sun
+
             threshold = self.getThreshold(altitude)
+
+            # Draw a line (2D) from the sun to the test location
 
             ir, ic = line(
                 self.locIdxX, self.locIdxY, *self.getPixelBoundary(region, azimuth)
             )
+
+            # If any pixel is above the threshold, the direction is occluded
 
             if np.all(mags[ir, ic] < threshold):
                 occluded[i] = True
@@ -261,9 +277,11 @@ class Limao(object):
 
         return altitudes, azimuths, intensities, occluded, np.array(dates)
 
-    def yearlyIntensityTable(self, size=100):
+    def yearlyIntensityTable(self):
 
-        altitudes, azimuths, intensities, occluded, dates = self.yearlyIntensity(size)
+        altitudes, azimuths, intensities, occluded, dates = self.yearlyIntensity(
+            self.size
+        )
 
         intensityTable = pd.DataFrame(
             {
@@ -290,6 +308,8 @@ class Limao(object):
 
     def intensityOnElevation(self, intensityTable, elevationOrientation=0):
 
+        # Split the overall intensity into two faces, each side of an elevation
+
         # North, elevationOrientation = 0, going clockwise
         # How to specify the 'normal'?
         left_az = np.mod(90 + elevationOrientation, 360)
@@ -306,38 +326,15 @@ class Limao(object):
         )
 
 
-if __name__ == "__main__":
+def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
 
-    # I'd like an argument, please
-    argParser = argparse.ArgumentParser()
-
-    argParser.add_argument(
-        "-s", type=str, dest="fileNameDSM", default="", help="DSM input file."
-    )
-    argParser.add_argument(
-        "-t", type=str, dest="fileNameDTM", default="", help="DTM input file."
-    )
-
-    argParser.add_argument(
-        "-lat", type=float, dest="lat", default=None, help="Latitutde."
-    )
-    argParser.add_argument(
-        "-lon", type=float, dest="lon", default=None, help="Longitude."
-    )
-
-    argParser.add_argument(
-        "--size", type=int, dest="size", default=100, help="Region Size"
-    )
-
-    args = argParser.parse_args()
-
-    limao = Limao(args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), args.size)
+    limao = Limao(fileNameDSM, fileNameDTM, latLon, size)
 
     # plt.imshow(limao.data.data.squeeze())
     # plt.savefig('data.png')
     # exit(0)
 
-    table = limao.yearlyIntensityTable(args.size)
+    table = limao.yearlyIntensityTable()
 
     isNorth, _, _ = limao.intensityOnElevation(table)
     table["isNorth"] = isNorth
@@ -406,3 +403,37 @@ if __name__ == "__main__":
     plt.legend(loc=0, fontsize=14)
     plt.savefig("testWeekAvg.pdf")
     plt.clf()
+
+
+if __name__ == "__main__":
+
+    # I'd like an argument, please
+    argParser = argparse.ArgumentParser()
+
+    argParser.add_argument(
+        "-s", type=str, dest="fileNameDSM", default="", help="DSM input file."
+    )
+    argParser.add_argument(
+        "-t", type=str, dest="fileNameDTM", default="", help="DTM input file."
+    )
+
+    argParser.add_argument(
+        "-lat", type=float, dest="lat", default=None, help="Latitutde."
+    )
+    argParser.add_argument(
+        "-lon", type=float, dest="lon", default=None, help="Longitude."
+    )
+
+    argParser.add_argument(
+        "--size",
+        type=int,
+        dest="size",
+        default=100,
+        help="Region Size around location.",
+    )
+
+    args = argParser.parse_args()
+
+    dailyAvgIntensity(
+        args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), args.size
+    )
