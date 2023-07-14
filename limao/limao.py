@@ -18,6 +18,9 @@ import numpy as np
 import pandas as pd
 from pprint import pprint
 
+import h5py
+import json
+
 import seaborn as sns
 
 colors = sns.color_palette("Set2")
@@ -212,6 +215,17 @@ class Limao(object):
         # Get surface and terrain maps
 
         region = self.loadRegion(self.data, self.locLL, size=size)
+
+        plt.imshow(region)
+        plt.savefig('data.pdf')
+        plt.clf()
+
+        f = h5py.File('data.h5', 'w')
+        f.create_dataset('data', data=region)
+        f.close()
+
+        json.dump(region.tolist(), open('data.json', 'w'), indent = 4)
+
         regionDTM = self.loadRegion(self.dataDTM, self.locLL, size=size)
 
         plt.imshow(region)
@@ -264,9 +278,9 @@ class Limao(object):
             # If any pixel is above the threshold, the direction is occluded
 
             if np.all(mags[ir, ic] < threshold):
-                occluded[i] = True
-            else:
                 occluded[i] = False
+            else:
+                occluded[i] = True
 
             altitudes[i] = altitude
             azimuths[i] = azimuth
@@ -330,14 +344,23 @@ def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
 
     limao = Limao(fileNameDSM, fileNameDTM, latLon, size)
 
-    # plt.imshow(limao.data.data.squeeze())
-    # plt.savefig('data.png')
-    # exit(0)
-
     table = limao.yearlyIntensityTable()
+
+    plt.plot(table[table['altitude'] > 0]['azimuth'], '.')
+    plt.plot(table[table['altitude'] < 0]['azimuth'], '.')
+    plt.savefig('az.pdf')
+    plt.clf()
+
+    plt.plot(table['altitude'], '.')
+    plt.savefig('alt.pdf')
+    plt.clf()
 
     isNorth, _, _ = limao.intensityOnElevation(table)
     table["isNorth"] = isNorth
+
+    plt.plot(table[table["isNorth"]]['azimuth'], '.')
+    plt.savefig('north_az.pdf')
+    plt.clf()
 
     plt.plot(table[~table["isNorth"]]["intensity_passed"], alpha=0.5, label="South")
     plt.plot(table[table["isNorth"]]["intensity_passed"], alpha=0.5, label="North")
@@ -350,25 +373,25 @@ def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
 
     tableDayAvg = (
         table.groupby(["day", "isNorth"])
-        .agg({"intensity_passed": "mean", "altitude": "mean", "azimuth": "mean"})
+        .agg({"intensity_passed": ["mean", "std", "min", "max"], "altitude": ["mean", "std", "min", "max"], "azimuth": ["mean", "std", "min", "max"]})
         .reset_index()
     )
 
     tableWeekAvg = (
         table.groupby(["week", "isNorth"])
-        .agg({"intensity_passed": "mean", "altitude": "mean", "azimuth": "mean"})
+        .agg({"intensity_passed": ["mean", "std", "min", "max"], "altitude": ["mean", "std", "min", "max"], "azimuth": ["mean", "std", "min", "max"]})
         .reset_index()
     )
 
     plt.plot(
         tableDayAvg[~tableDayAvg["isNorth"]]["day"],
-        tableDayAvg[~tableDayAvg["isNorth"]]["intensity_passed"],
+        tableDayAvg[~tableDayAvg["isNorth"]][("intensity_passed", "mean")],
         alpha=0.5,
         label="South",
     )
     plt.plot(
         tableDayAvg[tableDayAvg["isNorth"]]["day"],
-        tableDayAvg[tableDayAvg["isNorth"]]["intensity_passed"],
+        tableDayAvg[tableDayAvg["isNorth"]][("intensity_passed", "mean")],
         alpha=0.5,
         label="North",
     )
@@ -384,15 +407,27 @@ def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
 
     plt.plot(
         tableWeekAvg[~tableWeekAvg["isNorth"]]["week"],
-        tableWeekAvg[~tableWeekAvg["isNorth"]]["intensity_passed"],
+        tableWeekAvg[~tableWeekAvg["isNorth"]][("intensity_passed", "mean")],
         alpha=0.5,
         label="South",
     )
     plt.plot(
         tableWeekAvg[tableWeekAvg["isNorth"]]["week"],
-        tableWeekAvg[tableWeekAvg["isNorth"]]["intensity_passed"],
+        tableWeekAvg[tableWeekAvg["isNorth"]][("intensity_passed", "mean")],
         alpha=0.5,
         label="North",
+    )
+    plt.fill_between(tableWeekAvg[tableWeekAvg["isNorth"]]["week"],
+    tableWeekAvg[tableWeekAvg["isNorth"]][("intensity_passed", "min")],
+    tableWeekAvg[tableWeekAvg["isNorth"]][("intensity_passed", "max")],
+    alpha = 0.1,
+    color = 'k'
+    )
+    plt.fill_between(tableWeekAvg[~tableWeekAvg["isNorth"]]["week"],
+    tableWeekAvg[~tableWeekAvg["isNorth"]][("intensity_passed", "min")],
+    tableWeekAvg[~tableWeekAvg["isNorth"]][("intensity_passed", "max")],
+    alpha = 0.1,
+    color = 'k'
     )
 
     # plt.plot(tableDayAvg['day'], tableDayAvg['altitude'])
@@ -418,10 +453,10 @@ if __name__ == "__main__":
     )
 
     argParser.add_argument(
-        "-lat", type=float, dest="lat", default=None, help="Latitude."
+        "--lat", type=float, dest="lat", default=None, help="Latitude."
     )
     argParser.add_argument(
-        "-lon", type=float, dest="lon", default=None, help="Longitude."
+        "--lon", type=float, dest="lon", default=None, help="Longitude."
     )
 
     argParser.add_argument(
