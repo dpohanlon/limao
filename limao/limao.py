@@ -42,15 +42,14 @@ from datetime import datetime, timezone, timedelta
 
 
 class Limao(object):
-    def __init__(self, fileNameDSM, fileNameDTM, locLL, size, buildingAltitude=0):
+    def __init__(self, fileNameDSM, fileNameDTM, locLL, size, surfHeight=0.0):
 
         self.fileNameDSM = fileNameDSM
         self.fileNameDTM = fileNameDTM
         self.locLL = locLL
         self.size = size
 
-        # Does nothing, yet
-        self.buildingAltitude = buildingAltitude
+        self.surfHeight = surfHeight
 
         self.startDate = datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc)
 
@@ -174,15 +173,15 @@ class Limao(object):
 
         return dist
 
-    def observedSizes(self, region, regionDTM):
+    def observedSizes(self, region, regionDTM, surfHeight=0.0):
 
         size = region.shape[0]
 
         dist = self.distanceMatrix(size)
 
         # Only consider relative heights, using the terrain map for the 'ground'
-        # floor
-        mags = (region - regionDTM[self.locIdxX][self.locIdxY]) / dist
+        # floor, adjusting for height above the surface
+        mags = (region - regionDTM[self.locIdxX][self.locIdxY] - surfHeight) / dist
 
         return mags
 
@@ -217,14 +216,14 @@ class Limao(object):
         region = self.loadRegion(self.data, self.locLL, size=size)
 
         plt.imshow(region)
-        plt.savefig('data.pdf')
+        plt.savefig("data.pdf")
         plt.clf()
 
-        f = h5py.File('data.h5', 'w')
-        f.create_dataset('data', data=region)
+        f = h5py.File("data.h5", "w")
+        f.create_dataset("data", data=region)
         f.close()
 
-        json.dump(region.tolist(), open('data.json', 'w'), indent = 4)
+        json.dump(region.tolist(), open("data.json", "w"), indent=4)
 
         regionDTM = self.loadRegion(self.dataDTM, self.locLL, size=size)
 
@@ -238,13 +237,13 @@ class Limao(object):
 
         # Calculate observed heights of objects
 
-        mags = self.observedSizes(region, regionDTM)
+        mags = self.observedSizes(region, regionDTM, self.surfHeight)
 
         plt.imshow(mags)
         plt.savefig("mags.png")
         plt.clf()
 
-        hoursInYear = 24 * 7 * 52
+        hoursInYear = 24 * 7 * 52 // 6
 
         altitudes = np.zeros(hoursInYear)
         azimuths = np.zeros(hoursInYear)
@@ -287,7 +286,7 @@ class Limao(object):
             intensities[i] = radiation
             dates.append(date)
 
-            date = date + timedelta(hours=1)
+            date = date + timedelta(hours=6)
 
         return altitudes, azimuths, intensities, occluded, np.array(dates)
 
@@ -340,26 +339,79 @@ class Limao(object):
         )
 
 
+def intensityProjection(fileNameDSM, fileNameDTM, latLon, size):
+
+    nx = 20
+    ny = 8
+
+    intensities = np.zeros((nx, ny))
+
+    locOS = latlon_to_os(*latLon)
+
+    leftOS = list(reversed([(locOS[0] - i, locOS[1]) for i in range(nx // 2)]))
+    rightOS = [(locOS[0] + i, locOS[1]) for i in range(nx // 2)]
+
+    osCoords = leftOS + rightOS
+    llCoords = [os_to_latlon(*osCoord) for osCoord in osCoords]
+
+    altitudes = [i for i in range(ny)]
+
+    for i in tqdm(range(nx)):
+
+        loc = llCoords[i]
+
+        for j in range(ny):
+
+            alt = altitudes[j]
+
+            limao = Limao(fileNameDSM, fileNameDTM, loc, size, surfHeight=alt)
+
+            table = limao.yearlyIntensityTable()
+            isNorth, _, _ = limao.intensityOnElevation(table)
+            table["isNorth"] = isNorth
+
+            northIntensity = table[table["isNorth"]]["intensity_passed"]
+
+            meanIntensity = northIntensity.mean()
+
+            intensities[i][j] = meanIntensity
+
+    plt.imshow(
+        intensities.T,
+        origin="lower",
+        cmap="plasma",
+        extent=(0, nx, 0, ny),
+        interpolation="bilinear",
+    )
+
+    plt.colorbar().set_label(label="Average yearly intensity $(W/m^2)$", size=14)
+    plt.ylabel("z height $(m)$", fontsize=14)
+    plt.xlabel("x extent $(m)$", fontsize=14)
+
+    plt.savefig("projIntensities.pdf")
+    plt.clf()
+
+
 def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
 
     limao = Limao(fileNameDSM, fileNameDTM, latLon, size)
 
     table = limao.yearlyIntensityTable()
 
-    plt.plot(table[table['altitude'] > 0]['azimuth'], '.')
-    plt.plot(table[table['altitude'] < 0]['azimuth'], '.')
-    plt.savefig('az.pdf')
+    plt.plot(table[table["altitude"] > 0]["azimuth"], ".")
+    plt.plot(table[table["altitude"] < 0]["azimuth"], ".")
+    plt.savefig("az.pdf")
     plt.clf()
 
-    plt.plot(table['altitude'], '.')
-    plt.savefig('alt.pdf')
+    plt.plot(table["altitude"], ".")
+    plt.savefig("alt.pdf")
     plt.clf()
 
     isNorth, _, _ = limao.intensityOnElevation(table)
     table["isNorth"] = isNorth
 
-    plt.plot(table[table["isNorth"]]['azimuth'], '.')
-    plt.savefig('north_az.pdf')
+    plt.plot(table[table["isNorth"]]["azimuth"], ".")
+    plt.savefig("north_az.pdf")
     plt.clf()
 
     plt.plot(table[~table["isNorth"]]["intensity_passed"], alpha=0.5, label="South")
@@ -373,13 +425,25 @@ def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
 
     tableDayAvg = (
         table.groupby(["day", "isNorth"])
-        .agg({"intensity_passed": ["mean", "std", "min", "max"], "altitude": ["mean", "std", "min", "max"], "azimuth": ["mean", "std", "min", "max"]})
+        .agg(
+            {
+                "intensity_passed": ["mean", "std", "min", "max"],
+                "altitude": ["mean", "std", "min", "max"],
+                "azimuth": ["mean", "std", "min", "max"],
+            }
+        )
         .reset_index()
     )
 
     tableWeekAvg = (
         table.groupby(["week", "isNorth"])
-        .agg({"intensity_passed": ["mean", "std", "min", "max"], "altitude": ["mean", "std", "min", "max"], "azimuth": ["mean", "std", "min", "max"]})
+        .agg(
+            {
+                "intensity_passed": ["mean", "std", "min", "max"],
+                "altitude": ["mean", "std", "min", "max"],
+                "azimuth": ["mean", "std", "min", "max"],
+            }
+        )
         .reset_index()
     )
 
@@ -417,17 +481,19 @@ def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
         alpha=0.5,
         label="North",
     )
-    plt.fill_between(tableWeekAvg[tableWeekAvg["isNorth"]]["week"],
-    tableWeekAvg[tableWeekAvg["isNorth"]][("intensity_passed", "min")],
-    tableWeekAvg[tableWeekAvg["isNorth"]][("intensity_passed", "max")],
-    alpha = 0.1,
-    color = 'k'
+    plt.fill_between(
+        tableWeekAvg[tableWeekAvg["isNorth"]]["week"],
+        tableWeekAvg[tableWeekAvg["isNorth"]][("intensity_passed", "min")],
+        tableWeekAvg[tableWeekAvg["isNorth"]][("intensity_passed", "max")],
+        alpha=0.05,
+        color="blue",
     )
-    plt.fill_between(tableWeekAvg[~tableWeekAvg["isNorth"]]["week"],
-    tableWeekAvg[~tableWeekAvg["isNorth"]][("intensity_passed", "min")],
-    tableWeekAvg[~tableWeekAvg["isNorth"]][("intensity_passed", "max")],
-    alpha = 0.1,
-    color = 'k'
+    plt.fill_between(
+        tableWeekAvg[~tableWeekAvg["isNorth"]]["week"],
+        tableWeekAvg[~tableWeekAvg["isNorth"]][("intensity_passed", "min")],
+        tableWeekAvg[~tableWeekAvg["isNorth"]][("intensity_passed", "max")],
+        alpha=0.05,
+        color="blue",
     )
 
     # plt.plot(tableDayAvg['day'], tableDayAvg['altitude'])
@@ -448,6 +514,7 @@ if __name__ == "__main__":
     argParser.add_argument(
         "-s", type=str, dest="fileNameDSM", default="", help="DSM input file."
     )
+
     argParser.add_argument(
         "-t", type=str, dest="fileNameDTM", default="", help="DTM input file."
     )
@@ -455,6 +522,7 @@ if __name__ == "__main__":
     argParser.add_argument(
         "--lat", type=float, dest="lat", default=None, help="Latitude."
     )
+
     argParser.add_argument(
         "--lon", type=float, dest="lon", default=None, help="Longitude."
     )
@@ -467,8 +535,24 @@ if __name__ == "__main__":
         help="Region Size around location.",
     )
 
+    argParser.add_argument(
+        "-proj",
+        action="store_true",
+        dest="proj",
+        default=False,
+        help="Plot a spatial 2d projection map of intensity.",
+    )
+
     args = argParser.parse_args()
 
-    dailyAvgIntensity(
-        args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), args.size
-    )
+    if args.proj:
+
+        intensityProjection(
+            args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), args.size
+        )
+
+    else:
+
+        dailyAvgIntensity(
+            args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), args.size
+        )
