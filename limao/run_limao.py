@@ -97,6 +97,67 @@ def intensityProjection(fileNameDSM, fileNameDTM, latLon, size):
 
     pickle.dump(intensities, open('intensities.pkl', 'wb'))
 
+def intensityMap(fileNameDSM, fileNameDTM, size):
+
+    nx = 50
+    ny = 50
+
+    intensities = np.zeros((nx, ny))
+
+    dsm = rxr.open_rasterio(fileNameDSM, masked=True)
+    dtm = rxr.open_rasterio(fileNameDTM, masked=True)
+
+    realBounds = dsm.rio.bounds()
+
+    midReal = (realBounds[0] + (realBounds[2] - realBounds[0]) // 2, realBounds[1] + (realBounds[3] - realBounds[1]) // 2)
+
+    lx, ly = dsm.data.squeeze().shape
+
+    midPx = (lx // 2, ly // 2)
+
+    print(midReal)
+    print(midPx)
+
+    for i in tqdm(range(nx)):
+
+        for j in range(ny):
+
+            locReal = (i + midReal[0] - nx // 2, j + midReal[1] - ny // 2,)
+            locRealLL = os_to_latlon(*locReal)
+
+            # alt = dsm.data.squeeze()[i + midPx[0] - nx  // 2][j + midPx[1] - ny // 2]
+            #
+            # alt += dtm.data.squeeze()[i + midPx[0] - nx  // 2][j + midPx[1] - ny // 2]
+            #
+            # alt += 0.5 # A Hack so a build doesn't get occluded by itself (hopefully!)
+
+            alt = 2.0
+
+            limao = Limao(fileNameDSM, fileNameDTM, locRealLL, size, surfHeight=alt, distHack = True)
+
+            table = limao.yearlyIntensityTable(progress = False)
+
+            intensities[i][j] = table["intensity_passed"].mean()
+
+    plt.imshow(
+        intensities.T,
+        origin="lower",
+        cmap="plasma",
+        extent=(0, nx, 0, ny),
+        interpolation="bilinear",
+    )
+
+    plt.colorbar().set_label(label="Average yearly intensity $(W/m^2)$", size=14)
+    # plt.ylabel("z height $(m)$", fontsize=14)
+    # plt.xlabel("x extent $(m)$", fontsize=14)
+
+    plt.savefig("intensitiesMap.pdf")
+    plt.clf()
+
+    import pickle
+
+    pickle.dump(intensities, open('intensitiesMap.pkl', 'wb'))
+
 def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
 
     limao = Limao(fileNameDSM, fileNameDTM, latLon, size, surfHeight=2.0)
@@ -249,6 +310,8 @@ if __name__ == "__main__":
     )
 
     args = argParser.parse_args()
+
+    # intensityMap(args.fileNameDSM, args.fileNameDTM, args.size)
 
     if args.proj:
 
