@@ -23,13 +23,16 @@ from pysolar.radiation import get_radiation_direct
 
 from datetime import datetime, timezone, timedelta
 
+
 @functools.lru_cache
 def load_file(fileName):
     return rxr.open_rasterio(fileName, masked=True)
 
 
 class Limao(object):
-    def __init__(self, fileNameDSM, fileNameDTM, locLL, size, surfHeight=0.0, distHack = True):
+    def __init__(
+        self, fileNameDSM, fileNameDTM, locLL, size, surfHeight=0.0, distHack=True
+    ):
 
         self.fileNameDSM = fileNameDSM
         self.fileNameDTM = fileNameDTM
@@ -198,7 +201,7 @@ class Limao(object):
         # alt IN DEGREES
         return np.tan(np.radians(alt))
 
-    def yearlyIntensity(self, size, progress = True):
+    def yearlyIntensity(self, size, progress=True):
 
         # Get surface and terrain maps
 
@@ -244,7 +247,7 @@ class Limao(object):
 
         # For each hour over a year
 
-        for i in tqdm(range(hoursInYear), disable = not progress):
+        for i in tqdm(range(hoursInYear), disable=not progress):
 
             # Get sun properties for this date and location
 
@@ -279,7 +282,7 @@ class Limao(object):
 
         return altitudes, azimuths, intensities, occluded, np.array(dates)
 
-    def yearlyIntensityTable(self, progress = True):
+    def yearlyIntensityTable(self, progress=True):
 
         altitudes, azimuths, intensities, occluded, dates = self.yearlyIntensity(
             self.size, progress

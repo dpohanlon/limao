@@ -39,7 +39,8 @@ from pysolar.radiation import get_radiation_direct
 
 from datetime import datetime, timezone, timedelta
 
-from limao import Limao
+from limao.limao import Limao
+
 
 def intensityProjection(fileNameDSM, fileNameDTM, latLon, size):
 
@@ -68,7 +69,7 @@ def intensityProjection(fileNameDSM, fileNameDTM, latLon, size):
 
             limao = Limao(fileNameDSM, fileNameDTM, loc, size, surfHeight=alt)
 
-            table = limao.yearlyIntensityTable(progress = False)
+            table = limao.yearlyIntensityTable(progress=False)
             isNorth, _, _ = limao.intensityOnElevation(table)
             table["isNorth"] = isNorth
 
@@ -95,7 +96,8 @@ def intensityProjection(fileNameDSM, fileNameDTM, latLon, size):
 
     import pickle
 
-    pickle.dump(intensities, open('intensities.pkl', 'wb'))
+    pickle.dump(intensities, open("intensities.pkl", "wb"))
+
 
 def intensityMap(fileNameDSM, fileNameDTM, size):
 
@@ -109,7 +111,10 @@ def intensityMap(fileNameDSM, fileNameDTM, size):
 
     realBounds = dsm.rio.bounds()
 
-    midReal = (realBounds[0] + (realBounds[2] - realBounds[0]) // 2, realBounds[1] + (realBounds[3] - realBounds[1]) // 2)
+    midReal = (
+        realBounds[0] + (realBounds[2] - realBounds[0]) // 2,
+        realBounds[1] + (realBounds[3] - realBounds[1]) // 2,
+    )
 
     lx, ly = dsm.data.squeeze().shape
 
@@ -122,7 +127,10 @@ def intensityMap(fileNameDSM, fileNameDTM, size):
 
         for j in range(ny):
 
-            locReal = (i + midReal[0] - nx // 2, j + midReal[1] - ny // 2,)
+            locReal = (
+                i + midReal[0] - nx // 2,
+                j + midReal[1] - ny // 2,
+            )
             locRealLL = os_to_latlon(*locReal)
 
             # alt = dsm.data.squeeze()[i + midPx[0] - nx  // 2][j + midPx[1] - ny // 2]
@@ -133,9 +141,11 @@ def intensityMap(fileNameDSM, fileNameDTM, size):
 
             alt = 2.0
 
-            limao = Limao(fileNameDSM, fileNameDTM, locRealLL, size, surfHeight=alt, distHack = True)
+            limao = Limao(
+                fileNameDSM, fileNameDTM, locRealLL, size, surfHeight=alt, distHack=True
+            )
 
-            table = limao.yearlyIntensityTable(progress = False)
+            table = limao.yearlyIntensityTable(progress=False)
 
             intensities[i][j] = table["intensity_passed"].mean()
 
@@ -156,7 +166,8 @@ def intensityMap(fileNameDSM, fileNameDTM, size):
 
     import pickle
 
-    pickle.dump(intensities, open('intensitiesMap.pkl', 'wb'))
+    pickle.dump(intensities, open("intensitiesMap.pkl", "wb"))
+
 
 def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
 
