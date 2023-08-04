@@ -39,7 +39,8 @@ from pysolar.radiation import get_radiation_direct
 
 from datetime import datetime, timezone, timedelta
 
-from limao import Limao
+from limao.limao import Limao
+
 
 def intensityProjection(fileNameDSM, fileNameDTM, latLon, size):
 
@@ -68,7 +69,7 @@ def intensityProjection(fileNameDSM, fileNameDTM, latLon, size):
 
             limao = Limao(fileNameDSM, fileNameDTM, loc, size, surfHeight=alt)
 
-            table = limao.yearlyIntensityTable(progress = False)
+            table = limao.yearlyIntensityTable(progress=False)
             isNorth, _, _ = limao.intensityOnElevation(table)
             table["isNorth"] = isNorth
 
@@ -95,7 +96,8 @@ def intensityProjection(fileNameDSM, fileNameDTM, latLon, size):
 
     import pickle
 
-    pickle.dump(intensities, open('intensities.pkl', 'wb'))
+    pickle.dump(intensities, open("intensities.pkl", "wb"))
+
 
 def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
 
