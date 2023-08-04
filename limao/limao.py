@@ -1,17 +1,4 @@
-import matplotlib as mpl
-
-mpl.use("Agg")
-import matplotlib.pyplot as plt
-from matplotlib import rcParams
-
 from tqdm import tqdm
-
-rcParams["axes.facecolor"] = "FFFFFF"
-rcParams["savefig.facecolor"] = "FFFFFF"
-rcParams["xtick.direction"] = "in"
-rcParams["ytick.direction"] = "in"
-
-rcParams.update({"figure.autolayout": True})
 
 import numpy as np
 
@@ -21,11 +8,7 @@ from pprint import pprint
 import h5py
 import json
 
-import seaborn as sns
-
-colors = sns.color_palette("Set2")
-
-import argparse
+import functools
 
 import rioxarray as rxr
 import earthpy as et
@@ -40,24 +23,33 @@ from pysolar.radiation import get_radiation_direct
 
 from datetime import datetime, timezone, timedelta
 
+@functools.lru_cache
+def load_file(fileName):
+    return rxr.open_rasterio(fileName, masked=True)
+
 
 class Limao(object):
-    def __init__(self, fileNameDSM, fileNameDTM, locLL, size, surfHeight=0.0):
+    def __init__(self, fileNameDSM, fileNameDTM, locLL, size, surfHeight=0.0, distHack = True):
 
         self.fileNameDSM = fileNameDSM
         self.fileNameDTM = fileNameDTM
         self.locLL = locLL
         self.size = size
 
+        self.distHack = distHack
+
         self.surfHeight = surfHeight
 
-        self.startDate = datetime(2023, 1, 1, 0, 0, tzinfo=timezone.utc)
+        self.startDate = datetime(2020, 1, 1, 0, 0, tzinfo=timezone.utc)
 
         self.locIdxX = self.size // 2
         self.locIdxY = self.size // 2
 
-        self.data = rxr.open_rasterio(self.fileNameDSM, masked=True)
-        self.dataDTM = rxr.open_rasterio(self.fileNameDTM, masked=True)
+        # self.data = rxr.open_rasterio(self.fileNameDSM, masked=True)
+        # self.dataDTM = rxr.open_rasterio(self.fileNameDTM, masked=True)
+
+        self.data = load_file(self.fileNameDSM)
+        self.dataDTM = load_file(self.fileNameDTM)
 
         self.setDataParams(self.data)
 
@@ -160,16 +152,13 @@ class Limao(object):
         # Distance from loc
         dist = np.sqrt((xx - size // 2) ** 2 + (yy - size // 2) ** 2)
 
-        plt.imshow(dist)
-        plt.colorbar()
-        plt.savefig("dist.png")
-        plt.clf()
-
         # pixel to real distance
         dist *= self.scaleToPx
 
-        # A hack so that the building at the location doesn't occlude itself
-        dist[dist < 10] = 25
+        if self.distHack:
+
+            # A hack so that the building at the location doesn't occlude itself
+            dist[dist < 10] = 25
 
         return dist
 
@@ -209,41 +198,41 @@ class Limao(object):
         # alt IN DEGREES
         return np.tan(np.radians(alt))
 
-    def yearlyIntensity(self, size):
+    def yearlyIntensity(self, size, progress = True):
 
         # Get surface and terrain maps
 
         region = self.loadRegion(self.data, self.locLL, size=size)
 
-        plt.imshow(region)
-        plt.savefig("data.pdf")
-        plt.clf()
+        # plt.imshow(region)
+        # plt.savefig("data.pdf")
+        # plt.clf()
 
-        f = h5py.File("data.h5", "w")
-        f.create_dataset("data", data=region)
-        f.close()
+        # f = h5py.File("data.h5", "w")
+        # f.create_dataset("data", data=region)
+        # f.close()
 
-        json.dump(region.tolist(), open("data.json", "w"), indent=4)
+        # json.dump(region.tolist(), open("data.json", "w"), indent=4)
 
         regionDTM = self.loadRegion(self.dataDTM, self.locLL, size=size)
 
-        plt.imshow(region)
-        plt.savefig("region.png")
-        plt.clf()
-
-        plt.imshow(regionDTM)
-        plt.savefig("regionDTM.png")
-        plt.clf()
+        # plt.imshow(region)
+        # plt.savefig("region.png")
+        # plt.clf()
+        #
+        # plt.imshow(regionDTM)
+        # plt.savefig("regionDTM.png")
+        # plt.clf()
 
         # Calculate observed heights of objects
 
         mags = self.observedSizes(region, regionDTM, self.surfHeight)
 
-        plt.imshow(mags)
-        plt.savefig("mags.png")
-        plt.clf()
+        # plt.imshow(mags)
+        # plt.savefig("mags.png")
+        # plt.clf()
 
-        hoursInYear = 24 * 7 * 52 // 6
+        hoursInYear = 24 * 7 * 52
 
         altitudes = np.zeros(hoursInYear)
         azimuths = np.zeros(hoursInYear)
@@ -255,7 +244,7 @@ class Limao(object):
 
         # For each hour over a year
 
-        for i in tqdm(range(hoursInYear)):
+        for i in tqdm(range(hoursInYear), disable = not progress):
 
             # Get sun properties for this date and location
 
@@ -286,14 +275,14 @@ class Limao(object):
             intensities[i] = radiation
             dates.append(date)
 
-            date = date + timedelta(hours=6)
+            date = date + timedelta(hours=1)
 
         return altitudes, azimuths, intensities, occluded, np.array(dates)
 
-    def yearlyIntensityTable(self):
+    def yearlyIntensityTable(self, progress = True):
 
         altitudes, azimuths, intensities, occluded, dates = self.yearlyIntensity(
-            self.size
+            self.size, progress
         )
 
         intensityTable = pd.DataFrame(
@@ -336,223 +325,4 @@ class Limao(object):
             az_north,
             intensityTable[az_north]["intensity_passed"],
             intensityTable[~az_north]["intensity_passed"],
-        )
-
-
-def intensityProjection(fileNameDSM, fileNameDTM, latLon, size):
-
-    nx = 20
-    ny = 8
-
-    intensities = np.zeros((nx, ny))
-
-    locOS = latlon_to_os(*latLon)
-
-    leftOS = list(reversed([(locOS[0] - i, locOS[1]) for i in range(nx // 2)]))
-    rightOS = [(locOS[0] + i, locOS[1]) for i in range(nx // 2)]
-
-    osCoords = leftOS + rightOS
-    llCoords = [os_to_latlon(*osCoord) for osCoord in osCoords]
-
-    altitudes = [i for i in range(ny)]
-
-    for i in tqdm(range(nx)):
-
-        loc = llCoords[i]
-
-        for j in range(ny):
-
-            alt = altitudes[j]
-
-            limao = Limao(fileNameDSM, fileNameDTM, loc, size, surfHeight=alt)
-
-            table = limao.yearlyIntensityTable()
-            isNorth, _, _ = limao.intensityOnElevation(table)
-            table["isNorth"] = isNorth
-
-            northIntensity = table[table["isNorth"]]["intensity_passed"]
-
-            meanIntensity = northIntensity.mean()
-
-            intensities[i][j] = meanIntensity
-
-    plt.imshow(
-        intensities.T,
-        origin="lower",
-        cmap="plasma",
-        extent=(0, nx, 0, ny),
-        interpolation="bilinear",
-    )
-
-    plt.colorbar().set_label(label="Average yearly intensity $(W/m^2)$", size=14)
-    plt.ylabel("z height $(m)$", fontsize=14)
-    plt.xlabel("x extent $(m)$", fontsize=14)
-
-    plt.savefig("projIntensities.pdf")
-    plt.clf()
-
-
-def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
-
-    limao = Limao(fileNameDSM, fileNameDTM, latLon, size)
-
-    table = limao.yearlyIntensityTable()
-
-    plt.plot(table[table["altitude"] > 0]["azimuth"], ".")
-    plt.plot(table[table["altitude"] < 0]["azimuth"], ".")
-    plt.savefig("az.pdf")
-    plt.clf()
-
-    plt.plot(table["altitude"], ".")
-    plt.savefig("alt.pdf")
-    plt.clf()
-
-    isNorth, _, _ = limao.intensityOnElevation(table)
-    table["isNorth"] = isNorth
-
-    plt.plot(table[table["isNorth"]]["azimuth"], ".")
-    plt.savefig("north_az.pdf")
-    plt.clf()
-
-    plt.plot(table[~table["isNorth"]]["intensity_passed"], alpha=0.5, label="South")
-    plt.plot(table[table["isNorth"]]["intensity_passed"], alpha=0.5, label="North")
-
-    plt.xlabel("Hours from 1/1", fontsize=14)
-    plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
-    plt.legend(loc=0, fontsize=14)
-    plt.savefig("test.pdf")
-    plt.clf()
-
-    tableDayAvg = (
-        table.groupby(["day", "isNorth"])
-        .agg(
-            {
-                "intensity_passed": ["mean", "std", "min", "max"],
-                "altitude": ["mean", "std", "min", "max"],
-                "azimuth": ["mean", "std", "min", "max"],
-            }
-        )
-        .reset_index()
-    )
-
-    tableWeekAvg = (
-        table.groupby(["week", "isNorth"])
-        .agg(
-            {
-                "intensity_passed": ["mean", "std", "min", "max"],
-                "altitude": ["mean", "std", "min", "max"],
-                "azimuth": ["mean", "std", "min", "max"],
-            }
-        )
-        .reset_index()
-    )
-
-    plt.plot(
-        tableDayAvg[~tableDayAvg["isNorth"]]["day"],
-        tableDayAvg[~tableDayAvg["isNorth"]][("intensity_passed", "mean")],
-        alpha=0.5,
-        label="South",
-    )
-    plt.plot(
-        tableDayAvg[tableDayAvg["isNorth"]]["day"],
-        tableDayAvg[tableDayAvg["isNorth"]][("intensity_passed", "mean")],
-        alpha=0.5,
-        label="North",
-    )
-
-    # plt.plot(tableDayAvg['day'], tableDayAvg['altitude'])
-    # plt.plot(tableDayAvg["day"], tableDayAvg["azimuth"])
-
-    plt.xlabel("Day", fontsize=14)
-    plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
-    plt.legend(loc=0, fontsize=14)
-    plt.savefig("testDayAvg.pdf")
-    plt.clf()
-
-    plt.plot(
-        tableWeekAvg[~tableWeekAvg["isNorth"]]["week"],
-        tableWeekAvg[~tableWeekAvg["isNorth"]][("intensity_passed", "mean")],
-        alpha=0.5,
-        label="South",
-    )
-    plt.plot(
-        tableWeekAvg[tableWeekAvg["isNorth"]]["week"],
-        tableWeekAvg[tableWeekAvg["isNorth"]][("intensity_passed", "mean")],
-        alpha=0.5,
-        label="North",
-    )
-    plt.fill_between(
-        tableWeekAvg[tableWeekAvg["isNorth"]]["week"],
-        tableWeekAvg[tableWeekAvg["isNorth"]][("intensity_passed", "min")],
-        tableWeekAvg[tableWeekAvg["isNorth"]][("intensity_passed", "max")],
-        alpha=0.05,
-        color="blue",
-    )
-    plt.fill_between(
-        tableWeekAvg[~tableWeekAvg["isNorth"]]["week"],
-        tableWeekAvg[~tableWeekAvg["isNorth"]][("intensity_passed", "min")],
-        tableWeekAvg[~tableWeekAvg["isNorth"]][("intensity_passed", "max")],
-        alpha=0.05,
-        color="blue",
-    )
-
-    # plt.plot(tableDayAvg['day'], tableDayAvg['altitude'])
-    # plt.plot(tableDayAvg["day"], tableDayAvg["azimuth"])
-
-    plt.xlabel("Week", fontsize=14)
-    plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
-    plt.legend(loc=0, fontsize=14)
-    plt.savefig("testWeekAvg.pdf")
-    plt.clf()
-
-
-if __name__ == "__main__":
-
-    # I'd like an argument, please
-    argParser = argparse.ArgumentParser()
-
-    argParser.add_argument(
-        "-s", type=str, dest="fileNameDSM", default="", help="DSM input file."
-    )
-
-    argParser.add_argument(
-        "-t", type=str, dest="fileNameDTM", default="", help="DTM input file."
-    )
-
-    argParser.add_argument(
-        "--lat", type=float, dest="lat", default=None, help="Latitude."
-    )
-
-    argParser.add_argument(
-        "--lon", type=float, dest="lon", default=None, help="Longitude."
-    )
-
-    argParser.add_argument(
-        "--size",
-        type=int,
-        dest="size",
-        default=100,
-        help="Region Size around location.",
-    )
-
-    argParser.add_argument(
-        "-proj",
-        action="store_true",
-        dest="proj",
-        default=False,
-        help="Plot a spatial 2d projection map of intensity.",
-    )
-
-    args = argParser.parse_args()
-
-    if args.proj:
-
-        intensityProjection(
-            args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), args.size
-        )
-
-    else:
-
-        dailyAvgIntensity(
-            args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), args.size
         )
