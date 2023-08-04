@@ -98,6 +98,7 @@ def intensityProjection(fileNameDSM, fileNameDTM, latLon, size, horizontal, vert
 
     pickle.dump(intensities, open("intensities.pkl", "wb"))
 
+
 def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
 
     limao = Limao(fileNameDSM, fileNameDTM, latLon, size, surfHeight=2.0)
