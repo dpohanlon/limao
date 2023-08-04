@@ -15,6 +15,22 @@ Primarily this depends on the the building orientation, the latitude, and the ti
 
 For illumination on a wall, for example, for photovoltaic panel placement, Limão provides predicted sunlight intensities on a user-defined vertical plane in real space.
 
+# Installation
+
+Either from the PyPI release
+
+```bash
+pip install limao
+```
+
+or the bleeding edge via GitHub
+
+```bash
+git clone git@github.com:dpohanlon/limao.git
+cd limao
+pip install .
+```
+
 # Usage
 
 Requires digital surface models (DSM) and digital terrain models (DTM) for the region of interest, in addition to the latitude and longitude. For the UK these are available from [DEFRA](https://www.data.gov.uk/dataset/f0db0249-f17b-4036-9e65-309148c97ce4/national-lidar-programme) ([direct link](https://environment.data.gov.uk/DefraDataDownload/?Mode=survey)), and are derived from satellite LIDAR measurements. Latitude and longitude can be obtained from Google Maps.
