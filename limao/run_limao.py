@@ -42,10 +42,10 @@ from datetime import datetime, timezone, timedelta
 from limao.limao import Limao
 
 
-def intensityProjection(fileNameDSM, fileNameDTM, latLon, size):
+def intensityProjection(fileNameDSM, fileNameDTM, latLon, size, horizontal, vertical):
 
-    nx = 20
-    ny = 8
+    nx = horizontal
+    ny = vertical
 
     intensities = np.zeros((nx, ny))
 
@@ -208,8 +208,8 @@ def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
     plt.xlabel("Week number", fontsize=14)
     plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
     plt.legend(loc=0, fontsize=14)
-    plt.savefig("weekAvg.pdf")
-    plt.savefig("weekAvg.png")
+    plt.savefig("weekAvg.pdf", dpi = 300)
+    plt.savefig("weekAvg.png", dpi = 300)
     plt.clf()
 
 def run():
@@ -249,14 +249,28 @@ def run():
         help="Plot a spatial 2d projection map of intensity.",
     )
 
-    args = argParser.parse_args()
+    argParser.add_argument(
+        "--vertical",
+        type=int,
+        dest="vertical",
+        default=10,
+        help="Vertical extent of the projection.",
+    )
 
-    # intensityMap(args.fileNameDSM, args.fileNameDTM, args.size)
+    argParser.add_argument(
+        "--horizontal",
+        type=int,
+        dest="horizontal",
+        default=10,
+        help="Horizontal extent of the projection.",
+    )
+
+    args = argParser.parse_args()
 
     if args.proj:
 
         intensityProjection(
-            args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), args.size
+            args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), args.size, args.horizontal, args.vertical
         )
 
     else:
