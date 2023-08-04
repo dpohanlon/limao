@@ -212,8 +212,7 @@ def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
     plt.savefig("weekAvg.png")
     plt.clf()
 
-
-if __name__ == "__main__":
+def run():
 
     # I'd like an argument, please
     argParser = argparse.ArgumentParser()
@@ -252,6 +251,8 @@ if __name__ == "__main__":
 
     args = argParser.parse_args()
 
+    # intensityMap(args.fileNameDSM, args.fileNameDTM, args.size)
+
     if args.proj:
 
         intensityProjection(
@@ -263,3 +264,8 @@ if __name__ == "__main__":
         dailyAvgIntensity(
             args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), args.size
         )
+
+
+if __name__ == "__main__":
+
+    run()
