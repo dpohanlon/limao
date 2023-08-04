@@ -42,10 +42,10 @@ from datetime import datetime, timezone, timedelta
 from limao.limao import Limao
 
 
-def intensityProjection(fileNameDSM, fileNameDTM, latLon, size):
+def intensityProjection(fileNameDSM, fileNameDTM, latLon, size, horizontal, vertical):
 
-    nx = 20
-    ny = 8
+    nx = horizontal
+    ny = vertical
 
     intensities = np.zeros((nx, ny))
 
@@ -105,30 +105,30 @@ def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
 
     table = limao.yearlyIntensityTable()
 
-    plt.plot(table[table["altitude"] > 0]["azimuth"], ".")
-    plt.plot(table[table["altitude"] < 0]["azimuth"], ".")
-    plt.savefig("az.pdf")
-    plt.clf()
-
-    plt.plot(table["altitude"], ".")
-    plt.savefig("alt.pdf")
-    plt.clf()
+    # plt.plot(table[table["altitude"] > 0]["azimuth"], ".")
+    # plt.plot(table[table["altitude"] < 0]["azimuth"], ".")
+    # plt.savefig("az.pdf")
+    # plt.clf()
+    #
+    # plt.plot(table["altitude"], ".")
+    # plt.savefig("alt.pdf")
+    # plt.clf()
 
     isNorth, _, _ = limao.intensityOnElevation(table)
     table["isNorth"] = isNorth
 
-    plt.plot(table[table["isNorth"]]["azimuth"], ".")
-    plt.savefig("north_az.pdf")
-    plt.clf()
-
-    plt.plot(table[~table["isNorth"]]["intensity_passed"], alpha=0.5, label="South")
-    plt.plot(table[table["isNorth"]]["intensity_passed"], alpha=0.5, label="North")
-
-    plt.xlabel("Hours from 1/1", fontsize=14)
-    plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
-    plt.legend(loc=0, fontsize=14)
-    plt.savefig("test.pdf")
-    plt.clf()
+    # plt.plot(table[table["isNorth"]]["azimuth"], ".")
+    # plt.savefig("north_az.pdf")
+    # plt.clf()
+    #
+    # plt.plot(table[~table["isNorth"]]["intensity_passed"], alpha=0.5, label="South")
+    # plt.plot(table[table["isNorth"]]["intensity_passed"], alpha=0.5, label="North")
+    #
+    # plt.xlabel("Hours from 1/1", fontsize=14)
+    # plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
+    # plt.legend(loc=0, fontsize=14)
+    # plt.savefig("test.pdf")
+    # plt.clf()
 
     tableDayAvg = (
         table.groupby(["day", "isNorth"])
@@ -173,7 +173,7 @@ def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
     plt.xlabel("Day", fontsize=14)
     plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
     plt.legend(loc=0, fontsize=14)
-    plt.savefig("testDayAvg.pdf")
+    plt.savefig("dayAvg.pdf")
     plt.clf()
 
     plt.plot(
@@ -209,11 +209,11 @@ def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
     plt.xlabel("Week number", fontsize=14)
     plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
     plt.legend(loc=0, fontsize=14)
-    plt.savefig("testWeekAvg.pdf")
+    plt.savefig("weekAvg.pdf", dpi = 300)
+    plt.savefig("weekAvg.png", dpi = 300)
     plt.clf()
 
-
-if __name__ == "__main__":
+def run():
 
     # I'd like an argument, please
     argParser = argparse.ArgumentParser()
@@ -250,12 +250,28 @@ if __name__ == "__main__":
         help="Plot a spatial 2d projection map of intensity.",
     )
 
+    argParser.add_argument(
+        "--vertical",
+        type=int,
+        dest="vertical",
+        default=10,
+        help="Vertical extent of the projection.",
+    )
+
+    argParser.add_argument(
+        "--horizontal",
+        type=int,
+        dest="horizontal",
+        default=10,
+        help="Horizontal extent of the projection.",
+    )
+
     args = argParser.parse_args()
 
     if args.proj:
 
         intensityProjection(
-            args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), args.size
+            args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), args.size, args.horizontal, args.vertical
         )
 
     else:
@@ -263,3 +279,8 @@ if __name__ == "__main__":
         dailyAvgIntensity(
             args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), args.size
         )
+
+
+if __name__ == "__main__":
+
+    run()
