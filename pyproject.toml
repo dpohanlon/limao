@@ -24,3 +24,6 @@ h5py = "^3.9.0"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+limao = "limao.run_limao:run"
