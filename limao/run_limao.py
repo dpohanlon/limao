@@ -98,107 +98,36 @@ def intensityProjection(fileNameDSM, fileNameDTM, latLon, size):
 
     pickle.dump(intensities, open("intensities.pkl", "wb"))
 
-
-def intensityMap(fileNameDSM, fileNameDTM, size):
-
-    nx = 50
-    ny = 50
-
-    intensities = np.zeros((nx, ny))
-
-    dsm = rxr.open_rasterio(fileNameDSM, masked=True)
-    dtm = rxr.open_rasterio(fileNameDTM, masked=True)
-
-    realBounds = dsm.rio.bounds()
-
-    midReal = (
-        realBounds[0] + (realBounds[2] - realBounds[0]) // 2,
-        realBounds[1] + (realBounds[3] - realBounds[1]) // 2,
-    )
-
-    lx, ly = dsm.data.squeeze().shape
-
-    midPx = (lx // 2, ly // 2)
-
-    print(midReal)
-    print(midPx)
-
-    for i in tqdm(range(nx)):
-
-        for j in range(ny):
-
-            locReal = (
-                i + midReal[0] - nx // 2,
-                j + midReal[1] - ny // 2,
-            )
-            locRealLL = os_to_latlon(*locReal)
-
-            # alt = dsm.data.squeeze()[i + midPx[0] - nx  // 2][j + midPx[1] - ny // 2]
-            #
-            # alt += dtm.data.squeeze()[i + midPx[0] - nx  // 2][j + midPx[1] - ny // 2]
-            #
-            # alt += 0.5 # A Hack so a build doesn't get occluded by itself (hopefully!)
-
-            alt = 2.0
-
-            limao = Limao(
-                fileNameDSM, fileNameDTM, locRealLL, size, surfHeight=alt, distHack=True
-            )
-
-            table = limao.yearlyIntensityTable(progress=False)
-
-            intensities[i][j] = table["intensity_passed"].mean()
-
-    plt.imshow(
-        intensities.T,
-        origin="lower",
-        cmap="plasma",
-        extent=(0, nx, 0, ny),
-        interpolation="bilinear",
-    )
-
-    plt.colorbar().set_label(label="Average yearly intensity $(W/m^2)$", size=14)
-    # plt.ylabel("z height $(m)$", fontsize=14)
-    # plt.xlabel("x extent $(m)$", fontsize=14)
-
-    plt.savefig("intensitiesMap.pdf")
-    plt.clf()
-
-    import pickle
-
-    pickle.dump(intensities, open("intensitiesMap.pkl", "wb"))
-
-
 def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
 
     limao = Limao(fileNameDSM, fileNameDTM, latLon, size, surfHeight=2.0)
 
     table = limao.yearlyIntensityTable()
 
-    plt.plot(table[table["altitude"] > 0]["azimuth"], ".")
-    plt.plot(table[table["altitude"] < 0]["azimuth"], ".")
-    plt.savefig("az.pdf")
-    plt.clf()
-
-    plt.plot(table["altitude"], ".")
-    plt.savefig("alt.pdf")
-    plt.clf()
+    # plt.plot(table[table["altitude"] > 0]["azimuth"], ".")
+    # plt.plot(table[table["altitude"] < 0]["azimuth"], ".")
+    # plt.savefig("az.pdf")
+    # plt.clf()
+    #
+    # plt.plot(table["altitude"], ".")
+    # plt.savefig("alt.pdf")
+    # plt.clf()
 
     isNorth, _, _ = limao.intensityOnElevation(table)
     table["isNorth"] = isNorth
 
-    plt.plot(table[table["isNorth"]]["azimuth"], ".")
-    plt.savefig("north_az.pdf")
-    plt.clf()
-
-    plt.plot(table[~table["isNorth"]]["intensity_passed"], alpha=0.5, label="South")
-    plt.plot(table[table["isNorth"]]["intensity_passed"], alpha=0.5, label="North")
-
-    plt.xlabel("Hours from 1/1", fontsize=14)
-    plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
-    plt.legend(loc=0, fontsize=14)
-    plt.savefig("test.pdf")
-    plt.clf()
+    # plt.plot(table[table["isNorth"]]["azimuth"], ".")
+    # plt.savefig("north_az.pdf")
+    # plt.clf()
+    #
+    # plt.plot(table[~table["isNorth"]]["intensity_passed"], alpha=0.5, label="South")
+    # plt.plot(table[table["isNorth"]]["intensity_passed"], alpha=0.5, label="North")
+    #
+    # plt.xlabel("Hours from 1/1", fontsize=14)
+    # plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
+    # plt.legend(loc=0, fontsize=14)
+    # plt.savefig("test.pdf")
+    # plt.clf()
 
     tableDayAvg = (
         table.groupby(["day", "isNorth"])
@@ -243,7 +172,7 @@ def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
     plt.xlabel("Day", fontsize=14)
     plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
     plt.legend(loc=0, fontsize=14)
-    plt.savefig("testDayAvg.pdf")
+    plt.savefig("dayAvg.pdf")
     plt.clf()
 
     plt.plot(
@@ -279,7 +208,8 @@ def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
     plt.xlabel("Week number", fontsize=14)
     plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
     plt.legend(loc=0, fontsize=14)
-    plt.savefig("testWeekAvg.pdf")
+    plt.savefig("weekAvg.pdf")
+    plt.savefig("weekAvg.png")
     plt.clf()
 
 
@@ -321,8 +251,6 @@ if __name__ == "__main__":
     )
 
     args = argParser.parse_args()
-
-    # intensityMap(args.fileNameDSM, args.fileNameDTM, args.size)
 
     if args.proj:
 
