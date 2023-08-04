@@ -6,11 +6,20 @@ Limão calculates projected direct sunlight intensities over time for arbitrary 
 
 Primarily this depends on the the building orientation, the latitude, and the time of the year, but also on occluding obstacles. Limão incorporates time and location dependent sunlight intensity projections, with digital surface and terrain maps, to determine an estimated overall intensity as a function of time.
 
+
+# Applications
+
+<p align="center">
+  <img width="600" height="229" src="assets/profile.png">
+</p>
+
+For illumination on a wall, for example, for photovoltaic panel placement, Limão provides predicted sunlight intensities on a user-defined vertical plane in real space.
+
 # Usage
 
 Requires digital surface models (DSM) and digital terrain models (DTM) for the region of interest, in addition to the latitude and longitude. For the UK these are available from [DEFRA](https://www.data.gov.uk/dataset/f0db0249-f17b-4036-9e65-309148c97ce4/national-lidar-programme) ([direct link](https://environment.data.gov.uk/DefraDataDownload/?Mode=survey)), and are derived from satellite LIDAR measurements. Latitude and longitude can be obtained from Google Maps.
 
-**Currently this assumes UK DSM/DTMs as the lat/lon is converted into the UK OS map coordinates.**
+**Currently this assumes UK DSM/DTMs, as the lat/lon is converted into UK Ordnance Survey map coordinates.**
 
 At the moment this ignores occlusions within a configurable distance from the indicated location to avoid 'self' intersections, but this will probably be improved later.
 
