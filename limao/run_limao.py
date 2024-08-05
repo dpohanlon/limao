@@ -94,9 +94,7 @@ def intensityProjection(fileNameDSM, fileNameDTM, latLon, size, horizontal, vert
     plt.savefig("projIntensities.pdf")
     plt.clf()
 
-    import pickle
-
-    pickle.dump(intensities, open("intensities.pkl", "wb"))
+    return intensities
 
 
 def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
@@ -154,6 +152,18 @@ def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
         .reset_index()
     )
 
+    tableWeekAvgTotal = (
+        table.groupby("week")
+        .agg(
+            {
+                "intensity_passed": ["sum"],
+                "altitude": ["mean", "std", "min", "max"],
+                "azimuth": ["mean", "std", "min", "max"],
+            }
+        )
+        .reset_index()
+    )
+
     plt.plot(
         tableDayAvg[~tableDayAvg["isNorth"]]["day"],
         tableDayAvg[~tableDayAvg["isNorth"]][("intensity_passed", "mean")],
@@ -166,9 +176,6 @@ def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
         alpha=0.5,
         label="North",
     )
-
-    # plt.plot(tableDayAvg['day'], tableDayAvg['altitude'])
-    # plt.plot(tableDayAvg["day"], tableDayAvg["azimuth"])
 
     plt.xlabel("Day", fontsize=14)
     plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
@@ -203,15 +210,29 @@ def dailyAvgIntensity(fileNameDSM, fileNameDTM, latLon, size):
         color="blue",
     )
 
-    # plt.plot(tableDayAvg['day'], tableDayAvg['altitude'])
-    # plt.plot(tableDayAvg["day"], tableDayAvg["azimuth"])
-
     plt.xlabel("Week number", fontsize=14)
     plt.ylabel("Direct sunlight intensity $(W/m^2)$", fontsize=14)
     plt.legend(loc=0, fontsize=14)
-    plt.savefig("weekAvg.pdf", dpi = 300)
-    plt.savefig("weekAvg.png", dpi = 300)
+    plt.savefig("weekAvg.pdf", dpi=300)
+    plt.savefig("weekAvg.png", dpi=300)
     plt.clf()
+
+    plt.plot(
+        tableWeekAvgTotal["week"],
+        tableWeekAvgTotal[("intensity_passed", "sum")],
+        alpha=0.5,
+        label="Total",
+    )
+
+    plt.xlabel("Week number", fontsize=14)
+    plt.ylabel("Total direct sunlight intensity $(W/m^2)$", fontsize=14)
+    plt.legend(loc=0, fontsize=14)
+    plt.savefig("weekAvgTotal.pdf", dpi=300)
+    plt.savefig("weekAvgTotal.png", dpi=300)
+    plt.clf()
+
+    return table
+
 
 def run():
 
@@ -266,19 +287,40 @@ def run():
         help="Horizontal extent of the projection.",
     )
 
+    argParser.add_argument(
+        "--saveFile",
+        action="store_true",
+        dest="saveFile",
+        default=False,
+        help="Save the corresponding output to an HDF5 file.",
+    )
+
     args = argParser.parse_args()
 
     if args.proj:
 
-        intensityProjection(
-            args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), args.size, args.horizontal, args.vertical
+        intensities = intensityProjection(
+            args.fileNameDSM,
+            args.fileNameDTM,
+            (args.lat, args.lon),
+            args.size,
+            args.horizontal,
+            args.vertical,
         )
+
+        if args.saveFile:
+            h5py.File("intensities.h5", "w").create_dataset(
+                "intensities", data=intensities
+            )
 
     else:
 
-        dailyAvgIntensity(
+        table = dailyAvgIntensity(
             args.fileNameDSM, args.fileNameDTM, (args.lat, args.lon), args.size
         )
+
+        if args.saveFile:
+            table.to_hdf("dayAvgIntensities.h5", format="fixed", key="table", mode="w")
 
 
 if __name__ == "__main__":
